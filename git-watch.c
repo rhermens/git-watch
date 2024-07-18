@@ -1,8 +1,3 @@
-#include <cassert>
-#include <chrono>
-#include <cstdio>
-#include <ctime>
-#include <filesystem>
 #include <git2/annotated_commit.h>
 #include <git2/checkout.h>
 #include <git2/commit.h>
@@ -20,12 +15,12 @@
 #include <git2/status.h>
 #include <git2/tree.h>
 #include <git2/types.h>
-#include <iostream>
-#include <string>
+#include <stdio.h>
 #include <sys/types.h>
-#include <thread>
 #include <git2.h>
 #include <unistd.h>
+#include <stdlib.h>
+#include <pwd.h>
 #include <sys/stat.h>
 
 git_repository *REPOSITORY;
@@ -35,7 +30,19 @@ git_fetch_options FETCH_OPTIONS = GIT_FETCH_OPTIONS_INIT;
 
 int cred_cb(git_cred **out, const char *url, const char *username_from_url, unsigned int allowed_types, void *payload) {
     printf("Logging in\n");
-    return git_credential_ssh_key_new(out, username_from_url, "/home/roy/.ssh/id_ed25519.pub", "/home/roy/.ssh/id_ed25519", "");
+    const char *homedir;
+
+    if ((homedir = getenv("HOME")) == NULL) {
+        homedir = getpwuid(getuid())->pw_dir;
+    }
+
+    char pubkey[sizeof(homedir) + 20] = {};
+    char privkey[sizeof(homedir) + 16] = {};
+
+    sprintf(pubkey, "%s/.ssh/id_ed25519.pub", homedir);
+    sprintf(privkey, "%s/.ssh/id_ed25519", homedir);
+
+    return git_credential_ssh_key_new(out, username_from_url, pubkey, privkey, "");
 }
 
 int fetchhead_cb_merge(const char *ref_name, const char *remote_url, const git_oid *oid, unsigned int is_merge, void *payload) {
@@ -206,9 +213,8 @@ int do_push() {
 
     git_push_options push_options = GIT_PUSH_OPTIONS_INIT;
     push_options.callbacks.credentials = cred_cb;
-    std::string ref = "refs/heads/master";
-    char *r = (char *)ref.c_str();
-    git_strarray refspecs = { &r, 1 };
+    char *ref = "refs/heads/master";
+    git_strarray refspecs = { &ref, 1 };
     error = git_remote_push(REMOTE, &refspecs, &push_options);
 
     if (error != 0) {
@@ -223,24 +229,24 @@ int do_push() {
 
 int main(int args, char** argv) {
     if (args != 2) {
-        std::cerr << "Usage: autosync <path>" << std::endl;
+        printf("Usage: autosync <path>");
         return 1;
     }
 
-    std::filesystem::path repository_path(argv[1]);
-    if (!std::filesystem::is_directory(repository_path)) {
-        std::cerr << "Path does not exist" << std::endl;
+    struct stat repository_stat;
+    stat(argv[1], &repository_stat);
+    if (!(repository_stat.st_mode & S_IFDIR)) {
+        printf("Path does not exist");
         return 1;
     }
-
-    chdir(repository_path.c_str());
+    chdir(argv[1]);
 
     git_libgit2_init();
     FETCH_OPTIONS.callbacks.credentials = cred_cb;
     CHECKOUT_OPTIONS.checkout_strategy = GIT_CHECKOUT_SAFE;
     int error;
 
-    error = git_repository_open(&REPOSITORY, repository_path.c_str());
+    error = git_repository_open(&REPOSITORY, argv[1]);
     if (error != 0) {
         const git_error *e = git_error_last();
         printf("Error %d/%d: %s\n", error, e->klass, e->message);
@@ -254,11 +260,11 @@ int main(int args, char** argv) {
         exit(error);
     }
 
-    while (true) {
+    while (1) {
         printf("Watching..\n");
         do_fastforward();
         do_push();
         git_repository_state_cleanup(REPOSITORY);
-        std::this_thread::sleep_for(std::chrono::seconds(60));
+        sleep(60);
     }
 }

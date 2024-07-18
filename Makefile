@@ -1,4 +1,4 @@
-CC=g++
+CC=gcc
 
-git-watch: git-watch.cpp
-	$(CC) -o git-watch git-watch.cpp -I. -lgit2
+git-watch: git-watch.c
+	$(CC) -o git-watch git-watch.c -I. -lgit2
