@@ -1,28 +1,13 @@
-#include <git2/annotated_commit.h>
-#include <git2/checkout.h>
-#include <git2/commit.h>
-#include <git2/credential.h>
-#include <git2/errors.h>
+#include <git2/deprecated.h>
 #include <git2/global.h>
-#include <git2/index.h>
-#include <git2/merge.h>
-#include <git2/object.h>
-#include <git2/refs.h>
-#include <git2/remote.h>
-#include <git2/repository.h>
-#include <git2/revparse.h>
-#include <git2/signature.h>
-#include <git2/status.h>
-#include <git2/tree.h>
-#include <git2/types.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <sys/types.h>
-#include <git2.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <pwd.h>
 #include <sys/stat.h>
+
 #include "push.h"
 #include "fastforward.h"
 
