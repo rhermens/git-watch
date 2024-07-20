@@ -31,6 +31,11 @@ git_fetch_options FETCH_OPTIONS = GIT_FETCH_OPTIONS_INIT;
 git_commit_create_options COMMIT_OPTIONS = GIT_COMMIT_CREATE_OPTIONS_INIT;
 git_push_options PUSH_OPTIONS = GIT_PUSH_OPTIONS_INIT;
 
+typedef struct status_cb_payload {
+    git_index *index;
+    unsigned int changes;
+} status_cb_payload;
+
 void verbose_print(const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
@@ -100,8 +105,11 @@ done:
 }
 
 int status_foreach_cb(const char *path, unsigned int status_flags, void *payload) {
+    status_cb_payload *pl = (status_cb_payload *)payload;
+
     if (status_flags & GIT_STATUS_WT_DELETED) {
-        return git_index_remove_bypath((git_index *)payload, path);
+        pl->changes++;
+        return git_index_remove_bypath(pl->index, path);
     }
 
     time_t curr_time;
@@ -119,7 +127,8 @@ int status_foreach_cb(const char *path, unsigned int status_flags, void *payload
         return 0;
     }
 
-    return git_index_add_bypath((git_index *)payload, path);
+    pl->changes++;
+    return git_index_add_bypath(pl->index, path);
 }
 
 int do_fastforward() {
@@ -137,7 +146,7 @@ int do_push() {
     git_object *head_commit;
     git_reference *head_reference;
     git_oid commit_oid;
-    git_index *index;
+    status_cb_payload cb_payload = { .index = NULL, .changes = 0 };
     char *ref = "refs/heads/master";
     git_strarray refspecs = { &ref, 1 };
 
@@ -145,15 +154,20 @@ int do_push() {
         goto done;
     }
 
-    if ((status = git_repository_index(&index, REPOSITORY)) != 0) {
+    if ((status = git_repository_index(&cb_payload.index, REPOSITORY)) != 0) {
         goto done;
     }
 
-    if ((status = git_status_foreach(REPOSITORY, status_foreach_cb, index)) != 0) {
+    if ((status = git_status_foreach(REPOSITORY, status_foreach_cb, &cb_payload)) != 0) {
         goto done;
     }
 
-    if ((status = git_index_write(index)) != 0) {
+    if (cb_payload.changes == 0) {
+        verbose_print("No changes..\n");
+        goto done;
+    }
+
+    if ((status = git_index_write(cb_payload.index)) != 0) {
         goto done;
     }
 
@@ -168,7 +182,7 @@ int do_push() {
 done:
     git_object_free(head_commit);
     git_reference_free(head_reference);
-    git_index_free(index);
+    git_index_free(cb_payload.index);
 
     return status;
 }
@@ -210,16 +224,30 @@ int main(int args, char** argv) {
     setup_options();
     while (status == 0) {
         verbose_print("Watching..\n");
-        verbose_print("Fastforward..\n");
-        status = do_fastforward();
-        verbose_print("Push..\n");
-        status = do_push();
 
-        git_repository_state_cleanup(REPOSITORY);
+        verbose_print("Fastforward..\n");
+        if ((status = do_fastforward()) != 0) {
+            break;
+        }
+
+        verbose_print("Push..\n");
+        if ((status = do_push()) != 0) {
+            break;
+        }
+
+        if ((status = git_repository_state_cleanup(REPOSITORY)) != 0) {
+            break;
+        }
+
         sleep(60);
     }
 
-    const git_error *e = git_error_last();
-    fprintf(stderr, "Error %d/%d: %s\n", status, e->klass, e->message);
+
+    fprintf(stderr, "Error %d: %s\n", status, git_error_last()->message);
+
+    git_repository_free(REPOSITORY);
+    git_remote_free(REMOTE);
+    git_libgit2_shutdown();
+
     return status;
 }
