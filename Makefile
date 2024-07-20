@@ -1,4 +1,6 @@
 CC=gcc
+CFLAGS=-I. -lgit2 -pedantic-errors -Wall -std=c11
+DEPS=push.c fastforward.c
 
-git-watch: git-watch.c
-	$(CC) -o git-watch git-watch.c -I. -lgit2 -pedantic-errors -Wall -std=c11
+git-watch: git-watch.c $(DEPS)
+	$(CC) -o git-watch git-watch.c $(DEPS) $(CFLAGS)
