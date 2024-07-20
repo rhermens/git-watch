@@ -1,4 +1,6 @@
-#include <git2/deprecated.h>
+#include <git2/common.h>
+#include <git2/credential.h>
+#include <git2/errors.h>
 #include <git2/global.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -18,7 +20,7 @@ void verbose_print(const char *fmt, ...) {
     va_end(args);
 }
 
-int cred_cb(git_cred **out, const char *url, const char *username_from_url, unsigned int allowed_types, void *payload) {
+int cred_cb(git_credential **out, const char *url, const char *username_from_url, unsigned int allowed_types, void *payload) {
     const char *homedir;
 
     if ((homedir = getenv("HOME")) == NULL) {
@@ -35,7 +37,6 @@ int cred_cb(git_cred **out, const char *url, const char *username_from_url, unsi
 }
 
 int open_repository(git_repository **repository, git_remote **remote, char *path) {
-    git_libgit2_init();
     int error;
 
     if ((error = git_repository_open(repository, path)) != 0) {
@@ -55,7 +56,10 @@ void setup_options(git_checkout_options *checkout_options, git_fetch_options *fe
 
 int main(int args, char** argv) {
     if (args != 2) {
-        printf("Usage: %s <path>", argv[0]);
+        int maj, min, rev;
+        git_libgit2_version(&maj, &min, &rev);
+        printf("Usage: %s <path>\n", argv[0]);
+        printf("Libgit version %i.%i.%i\n", maj, min, rev);
         exit(1);
     }
 
@@ -74,6 +78,8 @@ int main(int args, char** argv) {
     git_fetch_options fetch_options = GIT_FETCH_OPTIONS_INIT;
     git_commit_create_options commit_options = GIT_COMMIT_CREATE_OPTIONS_INIT;
     git_push_options push_options = GIT_PUSH_OPTIONS_INIT;
+
+    git_libgit2_init();
 
     status = open_repository(&repository, &remote, argv[1]);
     setup_options(&checkout_options, &fetch_options, &push_options);
