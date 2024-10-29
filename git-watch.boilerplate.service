@@ -1,0 +1,9 @@
+[Unit]
+Description=git-watch
+
+[Service]
+ExecStart=/usr/bin/git-watch
+User=%u
+Group=%u
+Type=simple
+Restart=on-failure
