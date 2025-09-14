@@ -1,23 +1,8 @@
 use std::path::Path;
 
-use git2::{PushOptions, Repository, Status, StatusOptions};
+use git2::{Index, PushOptions, Repository, Status, StatusOptions, Statuses};
 
-pub fn push_worktree(repo: &Repository, push_options: &mut PushOptions) -> Result<(), git2::Error> {
-    let sig = repo.signature().expect("Failed to get commited signature");
-    let status = repo.statuses(Some(
-        StatusOptions::new()
-            .include_untracked(true)
-            .include_ignored(false)
-            .include_unmodified(false)
-            .include_unreadable(false),
-    ))?;
-
-    tracing::info!("changes: {:?}", status.iter().len());
-    if status.iter().len() == 0 {
-        return Ok(());
-    }
-
-    let mut index = repo.index()?;
+fn update_index_from_status(index: &mut Index, status: &Statuses) {
     for entry in status.iter() {
         tracing::info!("{:?}", entry.path());
         if let Err(err) = match entry.status() {
@@ -37,6 +22,26 @@ pub fn push_worktree(repo: &Repository, push_options: &mut PushOptions) -> Resul
             continue;
         }
     }
+}
+
+pub fn push_worktree(repo: &Repository, push_options: &mut PushOptions) -> Result<(), git2::Error> {
+    let sig = repo.signature().expect("Failed to get commited signature");
+    let mut index = repo.index()?;
+    let status = repo.statuses(Some(
+        StatusOptions::new()
+            .include_untracked(true)
+            .recurse_untracked_dirs(true)
+            .include_ignored(false)
+            .include_unmodified(false)
+            .include_unreadable(false),
+    ))?;
+
+    tracing::info!("changes: {:?}", status.iter().len());
+    if status.iter().len() == 0 {
+        return Ok(());
+    }
+
+    update_index_from_status(&mut index, &status);
 
     let _ = index.write()?;
     let current_head = repo.find_commit(repo.head()?.target().expect("No target"))?;

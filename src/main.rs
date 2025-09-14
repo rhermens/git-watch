@@ -27,9 +27,7 @@ enum EventKind {
 
 fn main() {
     let args = Args::parse();
-    tracing_subscriber::fmt()
-        .with_max_level(Level::INFO)
-        .init();
+    tracing_subscriber::fmt().with_max_level(Level::INFO).init();
 
     let (tx, rx) = mpsc::channel();
     let repo = Repository::open(&args.path).expect("Failed to open repository");
@@ -76,6 +74,7 @@ fn start_pull_interval(tx: mpsc::Sender<EventKind>) {
 
 fn start_fs_watch(path: PathBuf, tx: mpsc::Sender<EventKind>) {
     std::thread::spawn(move || {
+        let repo = Repository::open(&path).expect("Failed to open repository");
         let (dtx, rx) = mpsc::channel();
 
         let mut debouncer =
@@ -90,6 +89,11 @@ fn start_fs_watch(path: PathBuf, tx: mpsc::Sender<EventKind>) {
                 .expect("Failed to read events")
                 .iter()
                 .filter(|e| e.kind.is_remove() || e.kind.is_create() || e.kind.is_modify())
+                .filter(|e| {
+                    e.paths
+                        .iter()
+                        .any(|p| !repo.is_path_ignored(p).expect("Failed to check ignore"))
+                })
                 .count()
                 == 0
             {
