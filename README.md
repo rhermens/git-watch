@@ -125,7 +125,7 @@ Options per service:
 - `path`: repository path to sync. May be a Nix path or string such as `"~/Notes"`.
 - `logLevel`: one of `trace`, `debug`, `info`, `warn`, or `error`; defaults to `"info"`.
 - `interval`: sync interval in seconds; defaults to `60`.
-- `sshAuthSock`: SSH agent socket path to pass to the service. On Linux this defaults to `~/.1password/agent.sock`; set it to `null` to inherit the systemd user manager environment instead.
+- `sshAuthSock`: SSH agent socket path to pass to the service. Defaults to `home.sessionVariables.SSH_AUTH_SOCK` when set; otherwise no service-level override is added.
 
 On Linux, this creates systemd user services named:
 

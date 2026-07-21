@@ -42,8 +42,8 @@
 
                   sshAuthSock = lib.mkOption {
                     type = lib.types.nullOr lib.types.str;
-                    default = if pkgs.stdenv.isLinux then "${config.home.homeDirectory}/.1password/agent.sock" else null;
-                    description = "SSH agent socket path to pass to git-watch. Set to null to inherit the service manager environment.";
+                    default = config.home.sessionVariables.SSH_AUTH_SOCK or null;
+                    description = "SSH agent socket path to pass to git-watch. Defaults to home.sessionVariables.SSH_AUTH_SOCK when set.";
                   };
                 };
               });
