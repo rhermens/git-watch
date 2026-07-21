@@ -1,24 +1,24 @@
 # git-watch
 
-`git-watch` watches a Git worktree, stages filesystem changes as they happen, and periodically synchronizes with `origin`.
+`git-watch` periodically synchronizes a Git worktree with `origin`.
 
 It is intended for small personal repositories where automatic syncing is acceptable, such as notes or configuration repos.
 
 ## What it does
 
-- Watches a repository path recursively.
-- Ignores paths that Git marks as ignored.
-- Stages created, modified, and deleted files after a short debounce window.
-- Every 60 seconds:
-  - fetches `origin`
-  - fast-forwards when possible
-  - creates an `Autocommit` commit from the current index
-  - pushes `refs/heads/master` to `origin`
+On each interval, `git-watch`:
+
+1. Fetches `origin`.
+2. Fast-forwards the current branch when possible.
+3. Stages current worktree changes, including untracked files and deletions.
+4. Creates an `Autocommit` commit from the current index.
+5. Pushes `refs/heads/master` to `origin`.
 
 ## Caveats
 
 This tool is small and opinionated.
 
+- It syncs on a timer; it does not use filesystem notifications.
 - It currently pushes only `refs/heads/master`.
 - It expects an `origin` remote.
 - It creates commits with the fixed message `Autocommit`.
@@ -67,7 +67,7 @@ The flake exposes a Home Manager module:
 inputs.git-watch.url = "github:rhermens/git-watch";
 ```
 
-Import it from your Home Manager configuration:
+Import it from a Home Manager configuration:
 
 ```nix
 {
@@ -119,6 +119,13 @@ Configure one or more services:
 }
 ```
 
+Options per service:
+
+- `enable`: whether to create the service.
+- `path`: repository path to sync. May be a Nix path or string such as `"~/Notes"`.
+- `logLevel`: one of `trace`, `debug`, `info`, `warn`, or `error`; defaults to `"info"`.
+- `interval`: sync interval in seconds; defaults to `60`.
+
 On Linux, this creates systemd user services named:
 
 ```text
@@ -133,7 +140,14 @@ git-watch-notes
 git-watch-dotfiles
 ```
 
-The Home Manager `interval` option maps directly to the CLI `--interval` argument and is measured in seconds.
-
 Disabled entries are ignored.
 
+## Development
+
+Run the basic checks:
+
+```sh
+cargo fmt --check
+cargo check
+nix flake check
+```
