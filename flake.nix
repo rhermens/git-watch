@@ -39,6 +39,12 @@
                     default = 60;
                     description = "Sync interval in seconds";
                   };
+
+                  sshAuthSock = lib.mkOption {
+                    type = lib.types.nullOr lib.types.str;
+                    default = if pkgs.stdenv.isLinux then "${config.home.homeDirectory}/.1password/agent.sock" else null;
+                    description = "SSH agent socket path to pass to git-watch. Set to null to inherit the service manager environment.";
+                  };
                 };
               });
               default = { };
@@ -68,6 +74,8 @@
                     Service = {
                       ExecStart = "${git-watch}/bin/git-watch --path ${lib.escapeShellArg (toString service.path)} --log-level ${lib.escapeShellArg service.logLevel} --interval ${toString service.interval}";
                       Restart = "on-failure";
+                    } // lib.optionalAttrs (service.sshAuthSock != null) {
+                      Environment = "SSH_AUTH_SOCK=${service.sshAuthSock}";
                     };
                   })
                 enabledServices;
