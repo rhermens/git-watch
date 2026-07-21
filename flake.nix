@@ -22,7 +22,7 @@
           packages = [ pkgs.pkg-config pkgs.openssl ];
         };
 
-        homeManagerModules.git-fsnotify = { config, lib, pkgs, ... }:
+        homeManagerModules.default = { config, lib, pkgs, ... }:
           let
             cfg = config.services.git-fsnotify;
             enabledServices = lib.filterAttrs (_: service: service.enable) cfg;
