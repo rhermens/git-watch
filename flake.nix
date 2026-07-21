@@ -39,6 +39,12 @@
                       default = lib.mkHomeDirPath "git-fsnotify";
                       description = "Path to watch";
                     };
+
+                    logLevel = lib.mkOption {
+                      type = lib.types.enum [ "trace" "debug" "info" "warn" "error" ];
+                      default = "info";
+                      description = "Log level";
+                    };
                   };
                 });
                 default = { };
@@ -46,27 +52,55 @@
               };
             };
 
-            config = lib.mkIf (enabledServices != { }) {
-              home.packages = [ git-fsnotify ];
+            config = lib.mkIf (enabledServices != { }) (lib.mkMerge [
+              {
+                home.packages = [ git-fsnotify ];
+              }
 
-              systemd.user.services = lib.mapAttrs' (name: service:
-                lib.nameValuePair "git-fsnotify-${name}" {
-                  Unit = {
-                    Description = "Git fsnotify service ${name}";
-                    After = [ "network-online.target" ];
-                    Wants = [ "network-online.target" ];
-                  };
+              (lib.optionalAttrs pkgs.stdenv.isLinux {
+                systemd.user.services = lib.mapAttrs'
+                  (name: service:
+                    lib.nameValuePair "git-fsnotify-${name}" {
+                      Unit = {
+                        Description = "Git fsnotify service ${name}";
+                        After = [ "network-online.target" ];
+                        Wants = [ "network-online.target" ];
+                      };
 
-                  Install = {
-                    WantedBy = [ "default.target" ];
-                  };
+                      Install = {
+                        WantedBy = [ "default.target" ];
+                      };
 
-                  Service = {
-                    ExecStart = "${git-fsnotify}/bin/git-fsnotify --path ${lib.escapeShellArg (toString service.path)}";
-                    Restart = "on-failure";
-                  };
-                }) enabledServices;
-            };
+                      Service = {
+                        ExecStart = "${git-fsnotify}/bin/git-fsnotify --path ${lib.escapeShellArg (toString service.path)} --log-level ${lib.escapeShellArg service.logLevel}";
+                        Restart = "on-failure";
+                      };
+                    })
+                  enabledServices;
+              })
+
+              (lib.optionalAttrs pkgs.stdenv.isDarwin {
+                launchd.agents = lib.mapAttrs'
+                  (name: service:
+                    lib.nameValuePair "git-fsnotify-${name}" {
+                      enable = true;
+
+                      config = {
+                        Label = "org.nix-community.home.git-fsnotify-${name}";
+                        ProgramArguments = [
+                          "${git-fsnotify}/bin/git-fsnotify"
+                          "--path"
+                          (toString service.path)
+                          "--log-level"
+                          service.logLevel
+                        ];
+                        KeepAlive = true;
+                        RunAtLoad = true;
+                      };
+                    })
+                  enabledServices;
+              })
+            ]);
           };
 
         packages.default = git-fsnotify;
