@@ -8,11 +8,7 @@ use clap::Parser;
 use git2::{FetchOptions, PushOptions, RemoteCallbacks, Repository};
 use tracing::Level;
 
-use crate::{
-    fastforward::fast_forward,
-    ident::credentials_callback,
-    push::{push_worktree, update_index},
-};
+use crate::{fastforward::fast_forward, ident::credentials_callback, push::push_worktree};
 
 #[derive(Parser, Debug)]
 #[command(version)]
@@ -68,10 +64,6 @@ fn main() {
                 tracing::trace!("Processing tick");
                 if let Err(e) = fast_forward(&repo, &mut fetch_options) {
                     tracing::error!("error fast-forwarding: {}", e);
-                }
-
-                if let Err(err) = update_index(&repo) {
-                    tracing::error!("Error during commit: {:?}", err);
                 }
 
                 if let Err(e) = push_worktree(&repo, &mut push_options) {
