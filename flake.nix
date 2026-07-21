@@ -22,39 +22,52 @@
           packages = [ pkgs.pkg-config pkgs.openssl ];
         };
 
-        homeManagerModules.git-fsnotify = { config, lib, pkgs, ... }: {
-          options = {
-            services.git-fsnotify = {
-              enable = lib.mkEnableOption "git-fsnotify";
-              path = lib.mkOption {
-                type = lib.types.path;
-                default = lib.mkHomeDirPath "git-fsnotify";
-                description = "Path to watch";
+        homeManagerModules.git-fsnotify = { config, lib, pkgs, ... }:
+          let
+            cfg = config.services.git-fsnotify;
+            enabledServices = lib.filterAttrs (_: service: service.enable) cfg;
+          in
+          {
+            options = {
+              services.git-fsnotify = lib.mkOption {
+                type = lib.types.attrsOf (lib.types.submodule {
+                  options = {
+                    enable = lib.mkEnableOption "git-fsnotify";
+
+                    path = lib.mkOption {
+                      type = lib.types.path;
+                      default = lib.mkHomeDirPath "git-fsnotify";
+                      description = "Path to watch";
+                    };
+                  };
+                });
+                default = { };
+                description = "git-fsnotify service instances.";
               };
             };
-          };
 
-          config = lib.mkIf config.services.git-fsnotify.enable {
-            home.packages = [ git-fsnotify ];
+            config = lib.mkIf (enabledServices != { }) {
+              home.packages = [ git-fsnotify ];
 
-            systemd.user.services.git-fsnotify = {
-              Unit = {
-                Description = "Git fsnotify service";
-                After = [ "network-online.target" ];
-                Wants = [ "network-online.target" ];
-              };
+              systemd.user.services = lib.mapAttrs' (name: service:
+                lib.nameValuePair "git-fsnotify-${name}" {
+                  Unit = {
+                    Description = "Git fsnotify service ${name}";
+                    After = [ "network-online.target" ];
+                    Wants = [ "network-online.target" ];
+                  };
 
-              Install = {
-                WantedBy = [ "default.target" ];
-              };
+                  Install = {
+                    WantedBy = [ "default.target" ];
+                  };
 
-              Service = {
-                ExecStart = "${git-fsnotify}/bin/git-fsnotify --path ${config.services.git-fsnotify.path}";
-                Restart = "on-failure";
-              };
+                  Service = {
+                    ExecStart = "${git-fsnotify}/bin/git-fsnotify --path ${lib.escapeShellArg (toString service.path)}";
+                    Restart = "on-failure";
+                  };
+                }) enabledServices;
             };
           };
-        };
 
         packages.default = git-fsnotify;
       });

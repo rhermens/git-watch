@@ -19,8 +19,11 @@ use crate::{
 #[derive(Parser, Debug)]
 #[command(version)]
 struct Args {
-    #[arg(short, long)]
+    #[arg(short, long, value_parser=path_expand)]
     path: PathBuf,
+
+    #[arg(long, default_value_t = Level::INFO)]
+    log_level: Level,
 }
 
 #[derive(Debug)]
@@ -29,9 +32,19 @@ enum EventKind {
     Fs(()),
 }
 
+fn path_expand(value: &str) -> Result<PathBuf, String> {
+    Ok(PathBuf::from(
+        shellexpand::full(value)
+            .map_err(|_| "Invalid path")?
+            .into_owned(),
+    ))
+}
+
 fn main() {
     let args = Args::parse();
-    tracing_subscriber::fmt().with_max_level(Level::INFO).init();
+    tracing_subscriber::fmt()
+        .with_max_level(args.log_level)
+        .init();
 
     let (tx, rx) = mpsc::channel();
     let repo = Repository::open(&args.path).expect("Failed to open repository");
@@ -53,6 +66,7 @@ fn main() {
         tracing::trace!("Received event: {:?}", e);
         match e {
             EventKind::Tick(_) => {
+                tracing::trace!("Processing tick");
                 if let Err(e) = fast_forward(&repo, &mut fetch_options) {
                     tracing::error!("error fast-forwarding: {}", e);
                 }
@@ -62,7 +76,7 @@ fn main() {
                 }
             }
             EventKind::Fs(_) => {
-                tracing::trace!("Committing changes");
+                tracing::trace!("Adding changes");
                 if let Err(err) = update_index(&repo) {
                     tracing::error!("Error during commit: {:?}", err);
                 }
@@ -111,7 +125,6 @@ fn start_fs_watch(path: PathBuf, tx: mpsc::Sender<EventKind>) {
             }
 
             tracing::debug!("Fs change, broadcasting event");
-
             tx.send(EventKind::Fs(()))
                 .expect("Failed to send file system event");
         }

@@ -48,7 +48,7 @@ pub fn push_worktree(repo: &Repository, push_options: &mut PushOptions) -> Resul
     let sig = repo.signature().expect("Failed to get commited signature");
     let mut index = repo.index()?;
     let current_head = repo.find_commit(repo.head()?.target().expect("No target"))?;
-    let _ = repo.commit(
+    repo.commit(
         Some("HEAD"),
         &sig,
         &sig,
