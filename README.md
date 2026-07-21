@@ -1,6 +1,6 @@
-# git-fsnotify
+# git-watch
 
-`git-fsnotify` watches a Git worktree, stages filesystem changes as they happen, and periodically synchronizes with `origin`.
+`git-watch` watches a Git worktree, stages filesystem changes as they happen, and periodically synchronizes with `origin`.
 
 It is intended for small personal repositories where automatic syncing is acceptable, such as notes or configuration repos.
 
@@ -31,22 +31,25 @@ Use it only on repositories where automatic staging, committing, and pushing are
 ## Usage
 
 ```sh
-git-fsnotify --path ~/Notes --log-level info
+git-watch --path ~/Notes --log-level info --interval 60
 ```
 
 CLI options:
 
 ```text
-Usage: git-fsnotify [OPTIONS] --path <PATH>
+Usage: git-watch [OPTIONS] --path <PATH>
 
 Options:
   -p, --path <PATH>
       --log-level <LOG_LEVEL>  [default: INFO]
+      --interval <INTERVAL>    [default: 60]
   -h, --help                   Print help
   -V, --version                Print version
 ```
 
 `--path` supports shell-style expansion through `shellexpand`, so values like `~`, `~/repo`, and `$HOME/repo` work even when the caller does not expand them first.
+
+`--interval` controls how often, in seconds, `git-watch` fetches, fast-forwards, stages changes, commits, and pushes. It defaults to `60`.
 
 Valid log levels are:
 
@@ -61,7 +64,7 @@ Valid log levels are:
 The flake exposes a Home Manager module:
 
 ```nix
-inputs.git-fsnotify.url = "github:rhermens/git-fsnotify";
+inputs.git-watch.url = "github:rhermens/git-watch";
 ```
 
 Import it from your Home Manager configuration:
@@ -69,7 +72,7 @@ Import it from your Home Manager configuration:
 ```nix
 {
   imports = [
-    inputs.git-fsnotify.homeManagerModules.default
+    inputs.git-watch.homeManagerModules.default
   ];
 }
 ```
@@ -79,7 +82,7 @@ If you are importing from a NixOS module list that already enables Home Manager,
 ```nix
 {
   imports = [
-    inputs.git-fsnotify.nixosModules.default
+    inputs.git-watch.nixosModules.default
   ];
 }
 ```
@@ -89,7 +92,7 @@ For nix-darwin:
 ```nix
 {
   imports = [
-    inputs.git-fsnotify.darwinModules.default
+    inputs.git-watch.darwinModules.default
   ];
 }
 ```
@@ -98,17 +101,19 @@ Configure one or more services:
 
 ```nix
 {
-  services.git-fsnotify = {
+  services.git-watch = {
     notes = {
       enable = true;
       path = "~/Notes";
       logLevel = "info";
+      interval = 60;
     };
 
     dotfiles = {
       enable = true;
       path = "~/dotfiles";
       logLevel = "debug";
+      interval = 300;
     };
   };
 }
@@ -117,16 +122,18 @@ Configure one or more services:
 On Linux, this creates systemd user services named:
 
 ```text
-git-fsnotify-notes.service
-git-fsnotify-dotfiles.service
+git-watch-notes.service
+git-watch-dotfiles.service
 ```
 
 On macOS, this creates launchd agents named:
 
 ```text
-git-fsnotify-notes
-git-fsnotify-dotfiles
+git-watch-notes
+git-watch-dotfiles
 ```
+
+The Home Manager `interval` option maps directly to the CLI `--interval` argument and is measured in seconds.
 
 Disabled entries are ignored.
 

@@ -6,8 +6,6 @@ use std::{path::PathBuf, sync::mpsc, time::Duration};
 
 use clap::Parser;
 use git2::{FetchOptions, PushOptions, RemoteCallbacks, Repository};
-use notify::RecursiveMode;
-use notify_debouncer_full::new_debouncer;
 use tracing::Level;
 
 use crate::{
@@ -24,12 +22,14 @@ struct Args {
 
     #[arg(long, default_value_t = Level::INFO)]
     log_level: Level,
+
+    #[arg(long, default_value_t = 60)]
+    interval: u64,
 }
 
 #[derive(Debug)]
 enum EventKind {
     Tick(()),
-    Fs(()),
 }
 
 fn path_expand(value: &str) -> Result<PathBuf, String> {
@@ -59,8 +59,7 @@ fn main() {
     fetch_callbacks.credentials(credentials_callback);
     fetch_options.remote_callbacks(fetch_callbacks);
 
-    start_interval(tx.clone());
-    start_fs_watch(args.path, tx.clone());
+    start_interval(tx.clone(), args.interval);
 
     for e in rx {
         tracing::trace!("Received event: {:?}", e);
@@ -71,62 +70,24 @@ fn main() {
                     tracing::error!("error fast-forwarding: {}", e);
                 }
 
-                if let Err(e) = push_worktree(&repo, &mut push_options) {
-                    tracing::error!("error pushing: {}", e);
-                }
-            }
-            EventKind::Fs(_) => {
-                tracing::trace!("Adding changes");
                 if let Err(err) = update_index(&repo) {
                     tracing::error!("Error during commit: {:?}", err);
+                }
+
+                if let Err(e) = push_worktree(&repo, &mut push_options) {
+                    tracing::error!("error pushing: {}", e);
                 }
             }
         }
     }
 }
 
-fn start_interval(tx: mpsc::Sender<EventKind>) {
+fn start_interval(tx: mpsc::Sender<EventKind>, secs: u64) {
     std::thread::spawn(move || {
         loop {
-            std::thread::sleep(Duration::from_secs(60));
+            std::thread::sleep(Duration::from_secs(secs));
             tx.send(EventKind::Tick(()))
                 .expect("Failed to send interval tick");
-        }
-    });
-}
-
-fn start_fs_watch(path: PathBuf, tx: mpsc::Sender<EventKind>) {
-    std::thread::spawn(move || {
-        let repo = Repository::open(&path).expect("Failed to open repository");
-        let (dtx, rx) = mpsc::channel();
-
-        let mut debouncer =
-            new_debouncer(Duration::from_secs(30), None, dtx).expect("Failed to create debouncer");
-
-        debouncer
-            .watch(&path, RecursiveMode::Recursive)
-            .expect("failed to watch");
-
-        for result in rx {
-            if result
-                .expect("Failed to read events")
-                .iter()
-                .filter(|e| e.kind.is_remove() || e.kind.is_create() || e.kind.is_modify())
-                .filter(|e| {
-                    e.paths
-                        .iter()
-                        .any(|p| !repo.is_path_ignored(p).expect("Failed to check ignore"))
-                })
-                .count()
-                == 0
-            {
-                tracing::debug!("No relevant file system changes detected, skipping commit.");
-                continue;
-            }
-
-            tracing::debug!("Fs change, broadcasting event");
-            tx.send(EventKind::Fs(()))
-                .expect("Failed to send file system event");
         }
     });
 }

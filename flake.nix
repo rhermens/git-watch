@@ -1,5 +1,5 @@
 {
-  description = "git-fsnotify";
+  description = "git-watch";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -11,20 +11,20 @@
     let
       homeManagerModule = { config, lib, pkgs, ... }:
         let
-          cfg = config.services.git-fsnotify;
+          cfg = config.services.git-watch;
           enabledServices = lib.filterAttrs (_: service: service.enable) cfg;
-          git-fsnotify = self.packages.${pkgs.stdenv.hostPlatform.system}.default;
+          git-watch = self.packages.${pkgs.stdenv.hostPlatform.system}.default;
         in
         {
           options = {
-            services.git-fsnotify = lib.mkOption {
+            services.git-watch = lib.mkOption {
               type = lib.types.attrsOf (lib.types.submodule {
                 options = {
-                  enable = lib.mkEnableOption "git-fsnotify";
+                  enable = lib.mkEnableOption "git-watch";
 
                   path = lib.mkOption {
                     type = lib.types.either lib.types.path lib.types.str;
-                    default = lib.mkHomeDirPath "git-fsnotify";
+                    default = lib.mkHomeDirPath "git-watch";
                     description = "Path to watch";
                   };
 
@@ -33,22 +33,28 @@
                     default = "info";
                     description = "Log level";
                   };
+
+                  interval = lib.mkOption {
+                    type = lib.types.ints.positive;
+                    default = 60;
+                    description = "Sync interval in seconds";
+                  };
                 };
               });
               default = { };
-              description = "git-fsnotify service instances.";
+              description = "git-watch service instances.";
             };
           };
 
           config = lib.mkIf (enabledServices != { }) (lib.mkMerge [
             {
-              home.packages = [ git-fsnotify ];
+              home.packages = [ git-watch ];
             }
 
             (lib.mkIf pkgs.stdenv.isLinux {
               systemd.user.services = lib.mapAttrs'
                 (name: service:
-                  lib.nameValuePair "git-fsnotify-${name}" {
+                  lib.nameValuePair "git-watch-${name}" {
                     Unit = {
                       Description = "Git fsnotify service ${name}";
                       After = [ "network-online.target" ];
@@ -60,7 +66,7 @@
                     };
 
                     Service = {
-                      ExecStart = "${git-fsnotify}/bin/git-fsnotify --path ${lib.escapeShellArg (toString service.path)} --log-level ${lib.escapeShellArg service.logLevel}";
+                      ExecStart = "${git-watch}/bin/git-watch --path ${lib.escapeShellArg (toString service.path)} --log-level ${lib.escapeShellArg service.logLevel} --interval ${toString service.interval}";
                       Restart = "on-failure";
                     };
                   })
@@ -70,17 +76,19 @@
             (lib.mkIf pkgs.stdenv.isDarwin {
               launchd.agents = lib.mapAttrs'
                 (name: service:
-                  lib.nameValuePair "git-fsnotify-${name}" {
+                  lib.nameValuePair "git-watch-${name}" {
                     enable = true;
 
                     config = {
-                      Label = "org.nix-community.home.git-fsnotify-${name}";
+                      Label = "org.nix-community.home.git-watch-${name}";
                       ProgramArguments = [
-                        "${git-fsnotify}/bin/git-fsnotify"
+                        "${git-watch}/bin/git-watch"
                         "--path"
                         (toString service.path)
                         "--log-level"
                         service.logLevel
+                        "--interval"
+                        (toString service.interval)
                       ];
                       KeepAlive = true;
                       RunAtLoad = true;
@@ -96,7 +104,7 @@
         let
           pkgs = nixpkgs.legacyPackages.${system};
           craneLib = crane.mkLib pkgs;
-          git-fsnotify = craneLib.buildPackage {
+          git-watch = craneLib.buildPackage {
             src = craneLib.cleanCargoSource ./.;
             nativeBuildInputs = [ pkgs.pkg-config pkgs.openssl ];
           };
@@ -106,10 +114,10 @@
             packages = [ pkgs.pkg-config pkgs.openssl ];
           };
 
-          packages.default = git-fsnotify;
+          packages.default = git-watch;
         }) // {
       homeManagerModules.default = homeManagerModule;
-      homeManagerModules.git-fsnotify = homeManagerModule;
+      homeManagerModules.git-watch = homeManagerModule;
       nixosModules.default = { ... }: {
         home-manager.sharedModules = [ homeManagerModule ];
       };
