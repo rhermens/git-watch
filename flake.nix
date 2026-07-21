@@ -45,7 +45,7 @@
               home.packages = [ git-fsnotify ];
             }
 
-            (lib.optionalAttrs pkgs.stdenv.isLinux {
+            (lib.mkIf pkgs.stdenv.isLinux {
               systemd.user.services = lib.mapAttrs'
                 (name: service:
                   lib.nameValuePair "git-fsnotify-${name}" {
@@ -67,7 +67,7 @@
                 enabledServices;
             })
 
-            (lib.optionalAttrs pkgs.stdenv.isDarwin {
+            (lib.mkIf pkgs.stdenv.isDarwin {
               launchd.agents = lib.mapAttrs'
                 (name: service:
                   lib.nameValuePair "git-fsnotify-${name}" {
