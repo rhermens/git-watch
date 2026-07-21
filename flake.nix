@@ -8,8 +8,8 @@
   };
 
   outputs = { self, nixpkgs, flake-utils, crane }:
-    flake-utils.lib.eachDefaultSystem (system: 
-      let 
+    flake-utils.lib.eachDefaultSystem (system:
+      let
         pkgs = nixpkgs.legacyPackages.${system};
         craneLib = crane.mkLib pkgs;
         git-fsnotify = craneLib.buildPackage {
@@ -17,7 +17,7 @@
           nativeBuildInputs = [ pkgs.pkg-config pkgs.openssl ];
         };
       in
-        {
+      {
         devShells.default = pkgs.mkShell {
           packages = [ pkgs.pkg-config pkgs.openssl ];
         };

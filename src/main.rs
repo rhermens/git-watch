@@ -10,7 +10,11 @@ use notify::RecursiveMode;
 use notify_debouncer_full::new_debouncer;
 use tracing::Level;
 
-use crate::{fastforward::fast_forward, ident::credentials_callback, push::push_worktree};
+use crate::{
+    fastforward::fast_forward,
+    ident::credentials_callback,
+    push::{push_worktree, update_index},
+};
 
 #[derive(Parser, Debug)]
 #[command(version)]
@@ -42,19 +46,24 @@ fn main() {
     fetch_callbacks.credentials(credentials_callback);
     fetch_options.remote_callbacks(fetch_callbacks);
 
-    start_pull_interval(tx.clone());
+    start_interval(tx.clone());
     start_fs_watch(args.path, tx.clone());
 
     for e in rx {
         tracing::trace!("Received event: {:?}", e);
         match e {
             EventKind::Tick(_) => {
-                tracing::info!("Pulling changes");
-                fast_forward(&repo, &mut fetch_options);
+                if let Err(e) = fast_forward(&repo, &mut fetch_options) {
+                    tracing::error!("error fast-forwarding: {}", e);
+                }
+
+                if let Err(e) = push_worktree(&repo, &mut push_options) {
+                    tracing::error!("error pushing: {}", e);
+                }
             }
             EventKind::Fs(_) => {
-                tracing::info!("Committing changes");
-                if let Err(err) = push_worktree(&repo, &mut push_options) {
+                tracing::trace!("Committing changes");
+                if let Err(err) = update_index(&repo) {
                     tracing::error!("Error during commit: {:?}", err);
                 }
             }
@@ -62,7 +71,7 @@ fn main() {
     }
 }
 
-fn start_pull_interval(tx: mpsc::Sender<EventKind>) {
+fn start_interval(tx: mpsc::Sender<EventKind>) {
     std::thread::spawn(move || {
         loop {
             std::thread::sleep(Duration::from_secs(60));
@@ -78,7 +87,7 @@ fn start_fs_watch(path: PathBuf, tx: mpsc::Sender<EventKind>) {
         let (dtx, rx) = mpsc::channel();
 
         let mut debouncer =
-            new_debouncer(Duration::from_secs(10), None, dtx).expect("Failed to create debouncer");
+            new_debouncer(Duration::from_secs(30), None, dtx).expect("Failed to create debouncer");
 
         debouncer
             .watch(&path, RecursiveMode::Recursive)

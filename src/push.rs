@@ -24,8 +24,7 @@ fn update_index_from_status(index: &mut Index, status: &Statuses) {
     }
 }
 
-pub fn push_worktree(repo: &Repository, push_options: &mut PushOptions) -> Result<(), git2::Error> {
-    let sig = repo.signature().expect("Failed to get commited signature");
+pub fn update_index(repo: &Repository) -> Result<(), git2::Error> {
     let mut index = repo.index()?;
     let status = repo.statuses(Some(
         StatusOptions::new()
@@ -42,8 +41,12 @@ pub fn push_worktree(repo: &Repository, push_options: &mut PushOptions) -> Resul
     }
 
     update_index_from_status(&mut index, &status);
+    index.write()
+}
 
-    let _ = index.write()?;
+pub fn push_worktree(repo: &Repository, push_options: &mut PushOptions) -> Result<(), git2::Error> {
+    let sig = repo.signature().expect("Failed to get commited signature");
+    let mut index = repo.index()?;
     let current_head = repo.find_commit(repo.head()?.target().expect("No target"))?;
     let _ = repo.commit(
         Some("HEAD"),

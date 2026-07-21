@@ -1,11 +1,12 @@
 use git2::{FetchOptions, ObjectType, Repository};
 
-pub fn fast_forward(repo: &Repository, fetch_options: &mut FetchOptions) {
+pub fn fast_forward(
+    repo: &Repository,
+    fetch_options: &mut FetchOptions,
+) -> Result<(), git2::Error> {
     let mut remote = repo.find_remote("origin").expect("Failed to get remote");
     let refspec: &[&str; 0] = &[];
-    let _ = remote
-        .fetch(refspec, Some(fetch_options), None)
-        .expect("Failed to fetch remote");
+    remote.fetch(refspec, Some(fetch_options), None)?;
 
     repo.fetchhead_foreach(|_ref_name, _remote_url, oid, _is_merge| {
         tracing::info!("Checking fast-forward for {}", oid);
@@ -34,5 +35,4 @@ pub fn fast_forward(repo: &Repository, fetch_options: &mut FetchOptions) {
         tracing::info!("Fast-forwarded to {}", oid);
         true
     })
-    .expect("Failed to fetchhead foreach");
 }

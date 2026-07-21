@@ -7,6 +7,10 @@ pub fn credentials_callback(
     cred: Option<&str>,
     _allowed: CredentialType,
 ) -> Result<Cred, git2::Error> {
+    if let Ok(cred) = Cred::ssh_key_from_agent(cred.expect("Failed to get username from url")) {
+        return Ok(cred);
+    }
+
     Cred::ssh_key(
         cred.expect("Failed to get username from url"),
         None,
