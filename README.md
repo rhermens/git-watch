@@ -69,7 +69,27 @@ Import it from your Home Manager configuration:
 ```nix
 {
   imports = [
-    inputs.git-fsnotify.homeManagerModules.${pkgs.stdenv.hostPlatform.system}.git-fsnotify
+    inputs.git-fsnotify.homeManagerModules.default
+  ];
+}
+```
+
+If you are importing from a NixOS module list that already enables Home Manager, use the wrapper module instead:
+
+```nix
+{
+  imports = [
+    inputs.git-fsnotify.nixosModules.default
+  ];
+}
+```
+
+For nix-darwin:
+
+```nix
+{
+  imports = [
+    inputs.git-fsnotify.darwinModules.default
   ];
 }
 ```
@@ -81,13 +101,13 @@ Configure one or more services:
   services.git-fsnotify = {
     notes = {
       enable = true;
-      path = /home/roy/Notes;
+      path = "~/Notes";
       logLevel = "info";
     };
 
     dotfiles = {
       enable = true;
-      path = /home/roy/dotfiles;
+      path = "~/dotfiles";
       logLevel = "debug";
     };
   };
