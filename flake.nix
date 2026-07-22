@@ -100,6 +100,10 @@
                       ];
                       KeepAlive = true;
                       RunAtLoad = true;
+                    } // lib.optionalAttrs (service.sshAuthSock != null) {
+                      EnvironmentVariables = {
+                        SSH_AUTH_SOCK = service.sshAuthSock;
+                      };
                     };
                   })
                 enabledServices;
