@@ -58,6 +58,12 @@ pub fn push_worktree(repo: &Repository, push_options: &mut PushOptions) -> Resul
         &repo.find_tree(tree)?,
         &[&current_head],
     )?;
+    let branch = repo
+        .head()?
+        .shorthand()
+        .map_err(|_| git2::Error::from_str("HEAD is not a valid branch name"))?
+        .to_owned();
+    let refspec = format!("refs/heads/{branch}");
     repo.find_remote("origin")?
-        .push(&["refs/heads/master"], Some(push_options))
+        .push(&[refspec.as_str()], Some(push_options))
 }

@@ -12,14 +12,14 @@ On each interval, `git-watch`:
 2. Fast-forwards the current branch when possible.
 3. Stages current worktree changes, including untracked files and deletions.
 4. Creates an `Autocommit` commit from the current index.
-5. Pushes `refs/heads/master` to `origin`.
+5. Pushes the current branch to `origin`.
 
 ## Caveats
 
 This tool is small and opinionated.
 
 - It syncs on a timer; it does not use filesystem notifications.
-- It currently pushes only `refs/heads/master`.
+- It pushes the current checked-out branch.
 - It expects an `origin` remote.
 - It creates commits with the fixed message `Autocommit`.
 - It uses your repository Git identity for commits.

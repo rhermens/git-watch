@@ -2,7 +2,7 @@ mod fastforward;
 mod ident;
 mod push;
 
-use std::{path::PathBuf, sync::mpsc, time::Duration};
+use std::{path::PathBuf, time::Duration};
 
 use clap::Parser;
 use git2::{FetchOptions, PushOptions, RemoteCallbacks, Repository};
