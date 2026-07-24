@@ -14,6 +14,23 @@
           cfg = config.services.git-watch;
           enabledServices = lib.filterAttrs (_: service: service.enable) cfg;
           git-watch = self.packages.${pkgs.stdenv.hostPlatform.system}.default;
+          serviceProgram = name: service: pkgs.writeShellScript "git-watch-${name}" ''
+            configured_ssh_auth_sock=${lib.escapeShellArg (if service.sshAuthSock == null then "" else service.sshAuthSock)}
+
+            if [ -n "$configured_ssh_auth_sock" ]; then
+              export SSH_AUTH_SOCK="$configured_ssh_auth_sock"
+            elif [ -z "''${SSH_AUTH_SOCK:-}" ] && command -v launchctl >/dev/null 2>&1; then
+              launchd_ssh_auth_sock="$(launchctl getenv SSH_AUTH_SOCK || true)"
+              if [ -n "$launchd_ssh_auth_sock" ]; then
+                export SSH_AUTH_SOCK="$launchd_ssh_auth_sock"
+              fi
+            fi
+
+            exec ${git-watch}/bin/git-watch \
+              --path ${lib.escapeShellArg (toString service.path)} \
+              --log-level ${lib.escapeShellArg service.logLevel} \
+              --interval ${toString service.interval}
+          '';
         in
         {
           options = {
@@ -42,8 +59,8 @@
 
                   sshAuthSock = lib.mkOption {
                     type = lib.types.nullOr lib.types.str;
-                    default = config.home.sessionVariables.SSH_AUTH_SOCK or null;
-                    description = "SSH agent socket path to pass to git-watch. Defaults to home.sessionVariables.SSH_AUTH_SOCK when set.";
+                    default = null;
+                    description = "SSH agent socket path to pass to git-watch. When unset, git-watch inherits the user's SSH_AUTH_SOCK environment variable.";
                   };
                 };
               });
@@ -72,10 +89,8 @@
                     };
 
                     Service = {
-                      ExecStart = "${git-watch}/bin/git-watch --path ${lib.escapeShellArg (toString service.path)} --log-level ${lib.escapeShellArg service.logLevel} --interval ${toString service.interval}";
+                      ExecStart = "${serviceProgram name service}";
                       Restart = "on-failure";
-                    } // lib.optionalAttrs (service.sshAuthSock != null) {
-                      Environment = "SSH_AUTH_SOCK=${service.sshAuthSock}";
                     };
                   })
                 enabledServices;
@@ -89,21 +104,9 @@
 
                     config = {
                       Label = "org.nix-community.home.git-watch-${name}";
-                      ProgramArguments = [
-                        "${git-watch}/bin/git-watch"
-                        "--path"
-                        (toString service.path)
-                        "--log-level"
-                        service.logLevel
-                        "--interval"
-                        (toString service.interval)
-                      ];
+                      ProgramArguments = [ "${serviceProgram name service}" ];
                       KeepAlive = true;
                       RunAtLoad = true;
-                    } // lib.optionalAttrs (service.sshAuthSock != null) {
-                      EnvironmentVariables = {
-                        SSH_AUTH_SOCK = service.sshAuthSock;
-                      };
                     };
                   })
                 enabledServices;
